@@ -1,0 +1,16 @@
+let
+    // Function to get the token
+    GetToken = () => let
+    url = "YOUR_WEBPAGE",
+    headers = [#"Accept-Version" = "2.0", #"Content-Type" = "application/json", #"Authorization" = "Basic YOUR_BASE64_ENCODED_CREDENTIALS"],
+    postData = Json.FromValue([Username = "your_username", Password = "your_password"]),
+    response = Web.Contents(url, [Headers = headers, Content = postData]),
+    jsonResponse = response,
+    AccessToken = Text.FromBinary(jsonResponse)
+in
+    AccessToken,
+    // Get the access token
+    AccessToken = GetToken(),
+    #"In Tabelle konvertieren" = Table.FromValue(AccessToken)
+in
+    #"In Tabelle konvertieren"
