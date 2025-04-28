@@ -1,0 +1,121 @@
+let
+
+    // Schritt 1: Datumstabelle erstellen (1. August 2023 bis heute)
+    StartDate = #date(2023, 8, 1),
+    EndDate = Date.From(DateTime.LocalNow()),
+    DateList = List.Dates(StartDate, Duration.Days(EndDate - StartDate) + 1, #duration(1, 0, 0, 0)),
+    DateTable = Table.FromList(DateList, Splitter.SplitByNothing(), {"Date"}, null, ExtraValues.Error),
+
+    // Schritt 2: Token aus der "Token"-Tabelle holen
+    TokenTable = Token,
+    AccessToken = "YOUR_ACCESS_TOKEN",
+    // Schritt 3: Funktion für statische API-Abfrage pro Datum mit RelativePath und Query
+
+    GetDataForDate = (date as date) as table =>
+    let
+    BaseUrl = "https://api.example.com",
+    RelativePath = "partners/your_partner_id/scans",
+    QueryParams = [
+    #"filter[created_at]" = Date.ToText(date, "yyyy-MM-dd"),
+    #"page_size" = "1000"
+    ],
+    Headers = [#"Accept-Version" = "2.0", #"Authorization" = "Bearer " & AccessToken],
+    Response = Web.Contents(
+    BaseUrl,
+    [
+    RelativePath = RelativePath,
+    Query = QueryParams,
+    Headers = Headers
+    ]
+    ),
+    JsonResponse = Json.Document(Response),
+    ResultTable = Table.FromList(JsonResponse, Record.FieldValues)
+in
+    ResultTable,
+
+    // Schritt 4: Daten für jedes Datum abrufen, kombinieren und erweitern
+    AddDataColumn = Table.AddColumn(DateTable, "Data", each GetDataForDate([Date]), type table),
+    ExpandData = Table.ExpandTableColumn(AddDataColumn, "Data", {"Column1", "Column2", "Column3", "Column4", "Column5", "Column6", "Column7", "Column8", "Column9", "Column10", "Column11", "Column12", "Column13"}),
+
+    // Schritt 5: Spalten umbenennen
+    #"Renamed Columns" = Table.RenameColumns(ExpandData, {
+    {"Column1", "ID"},
+    {"Column2", "user_ID"},
+    {"Column3", "partner_location_id"},
+    {"Column4", "packaging_station_id"},
+    {"Column5", "shop_id"},
+    {"Column6", "order_id"},
+    {"Column7", "scantype"},
+    {"Column8", "unitid"},
+    {"Column9", "condition"},
+    {"Column10", "circulations"},
+    {"Column11", "latitude"},
+    {"Column12", "longitude"},
+    {"Column13", "created_at"}
+    }),
+
+    // Schritt 6: Daten Transformationen
+
+    // Convert "created_at" to datetime and remove timezone
+    #"Converted to DateTime" = Table.TransformColumns(#"Renamed Columns", {{"created_at", each DateTimeZone.From(_, "en-US")}}),
+    #"Removed Timezone" = Table.TransformColumns(#"Converted to DateTime", {{"created_at", DateTimeZone.RemoveZone}}),
+    // Add "looptype" column based on barcode mapping
+    #"Added looptype" = Table.AddColumn(#"Removed Timezone", "looptype", each let
+    barcode = Text.Start([unitid], 4),
+    mapping = {
+    {"60AP", "A2"}, {"70AP", "A3"}, {"10AP", "B1"}, {"20AP", "B2"}, {"30AP", "B3"},
+    {"40AP", "B4"}, {"01AP", "C1"}, {"02AP", "C2"}, {"03AP", "C3"}, {"10RZ", "TEST"},
+    {"20RZ", "TEST"}, {"30RZ", "TEST"}, {"60RZ", "TEST"}, {"35RZ", "TEST"}, {"75RZ", "TEST"}
+    },
+    looptype = List.First(List.Select(mapping, each _{0} = barcode), {"Unknown"}){1}
+in
+    looptype, type text),
+
+    // Add "dateonly" column
+    #"Added dateonly" = Table.AddColumn(#"Added looptype", "DateOnly", each Date.From([created_at]), type date),
+    // Add "TypeDate" column
+    #"Added TypeDate" = Table.AddColumn(#"Added dateonly", "TypeDate", each [looptype] & " - " & Text.From([DateOnly]), type text),
+    // Sort rows by "created_at" descending
+    #"Sorted Rows" = Table.Sort(#"Added TypeDate", {{"created_at", Order.Descending}}),
+
+    // Replace errors
+    #"Replaced Errors" = Table.ReplaceErrorValues(#"Sorted Rows", {
+    {"ID", null}, {"user_ID", null}, {"partner_location_id", null}, {"packaging_station_id", null},
+    {"shop_id", null}, {"order_id", null}, {"scantype", null}, {"unitid", null}, {"condition", null},
+    {"circulations", null}, {"latitude", null}, {"longitude", null}, {"Date", null}, {"looptype", null},
+    {"TypeDate", null}, {"DateOnly", null}
+    }),
+
+    // Transform column types
+    #"Transformed Column Types" = Table.TransformColumnTypes(#"Replaced Errors", {
+    {"ID", type text}, {"user_ID", type text}, {"partner_location_id", type text},
+    {"packaging_station_id", type text}, {"shop_id", type text}, {"order_id", type text},
+    {"scantype", type text}, {"unitid", type text}, {"condition", type text}, {"circulations", type text},
+    {"latitude", type text}, {"longitude", type text}, {"Date", type date}, {"looptype", type text},
+    {"TypeDate", type text}, {"DateOnly", type date}
+    }),
+
+    // Replace commas with dots in "latitude" and "longitude"
+    #"Replaced Commas" = Table.ReplaceValue(#"Transformed Column Types", ",", ".", Replacer.ReplaceText, {"latitude", "longitude"}),
+    // Filter out rows where "latitude" starts with "56."
+    #"Filtered Latitude" = Table.SelectRows(#"Replaced Commas", each not Text.StartsWith([latitude], "56.")),
+
+    // Add "Shop" column with mapping
+    #"Mapped Shop" = Table.AddColumn(#"Filtered Latitude", "Shop", each let
+    shop_id = try Record.Field(_, "shop_id") otherwise null,
+    ShopMapping = {
+    {"01H2TBEWN1GGPVYZMEYMXP3YM3", "Shop A"},
+    {"01GRTKFR29987KNDVF15S8MCNS", "Shop B"},
+    {"01H3H1TT7W1SWPX32EWA07Y2WR", "Shop C"},
+    {"01H4E35R61ZA9SPMN5H92FDTPY", "Shop D"},
+    {"01HTZ1VG2HBNGXZ6M720FG00JS", "Shop E"}
+    },
+    mapped_shop = try List.First(List.Select(ShopMapping, each _{0} = shop_id)){1} otherwise shop_id
+in
+    mapped_shop, type text),
+    // Final transformations and error handling for "Shop"
+    #"Spalten transformieren" = Table.TransformColumnTypes(#"Mapped Shop", {{"Shop", type text}}),
+    #"Fehler ersetzen" = Table.ReplaceErrorValues(#"Spalten transformieren", {{"Shop", null}}),
+    #"DFR-637265617465645F6174-autogenerated_for_incremental_refresh" = Table.SelectRows(#"Fehler ersetzen", each DateTime.From([created_at]) >= RangeStart and DateTime.From([created_at]) < RangeEnd)
+in
+    #"DFR-637265617465645F6174-autogenerated_for_incremental_refresh"
