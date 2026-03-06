@@ -104,11 +104,11 @@ in
     #"Mapped Shop" = Table.AddColumn(#"Filtered Latitude", "Shop", each let
     shop_id = try Record.Field(_, "shop_id") otherwise null,
     ShopMapping = {
-    {"01H2TBEWN1GGPVYZMEYMXP3YM3", "Shop A"},
-    {"01GRTKFR29987KNDVF15S8MCNS", "Shop B"},
-    {"01H3H1TT7W1SWPX32EWA07Y2WR", "Shop C"},
-    {"01H4E35R61ZA9SPMN5H92FDTPY", "Shop D"},
-    {"01HTZ1VG2HBNGXZ6M720FG00JS", "Shop E"}
+    {"shop_ID", "Shop A"},
+    {"shop_ID", "Shop B"},
+    {"shop_ID", "Shop C"},
+    {"shop_ID", "Shop D"},
+    {"shop_ID", "Sh   op E"}
     },
     mapped_shop = try List.First(List.Select(ShopMapping, each _{0} = shop_id)){1} otherwise shop_id
 in
