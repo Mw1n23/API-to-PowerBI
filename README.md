@@ -1,16 +1,29 @@
-## Power Query M Scripts
-This repository contains two Power Query M scripts designed for data retrieval and transformation from an API.
+# API to Power BI (Power Query M)
 
+## Overview
+This repository contains Power Query M scripts for:
+- retrieving an API access token (`Get_AccessToken`)
+- loading and transforming API scan data (`Dataflow`)
 
+## Files
+- `Get_AccessToken`: token retrieval query (POST request).
+- `Dataflow`: date-based data extraction and transformation query.
 
-### "Get_AccessToken": Token Retrieval
-Description:
-This script retrieves an access token from an API using a POST request with basic authentication. The token is then converted into a table format.
+## Setup in Power BI
+1. Open **Power BI Desktop**.
+2. Create two blank queries and paste script content:
+   - one query named `Token` (from `Get_AccessToken`)
+   - one query for data loading (from `Dataflow`)
+3. Replace placeholders:
+   - `YOUR_WEBPAGE`
+   - `YOUR_BASE64_ENCODED_CREDENTIALS`
+   - `your_username` / `your_password`
+   - `https://api.example.com`
+   - `your_partner_id`
+   - shop mappings in `Dataflow`
+4. Configure incremental refresh parameters (`RangeStart`, `RangeEnd`) if required.
 
-
-
-### "Dataflow": Data Retrieval and Transformation
-**Description:** 
-This script retrieves data from an API for each date within a specified range, combines the data, and performs various transformations. The script includes steps for creating a date table, fetching data using an API, expanding and renaming columns, and performing data transformations.
-
-
+## Security Notes
+- Do not commit real credentials or tokens.
+- Use Power BI parameterization and secure credential storage.
+- Keep this repo free from exported datasets containing sensitive data.

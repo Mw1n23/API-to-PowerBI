@@ -1,0 +1,20 @@
+name: Repo Check
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify required files
+        run: |
+          test -f Dataflow
+          test -f Get_AccessToken
+          test -f README.md
+      - name: Ensure placeholders are still present
+        run: |
+          grep -q "YOUR_WEBPAGE" Get_AccessToken
+          grep -q "YOUR_ACCESS_TOKEN" Dataflow

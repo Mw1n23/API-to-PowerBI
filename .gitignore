@@ -1,0 +1,12 @@
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Local exports and secrets
+*.csv
+*.xlsx
+*.json
+*.log
+.env
